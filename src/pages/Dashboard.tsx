@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, CheckCircle, TrendingUp, Activity, Zap, AlertTriangle } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 interface DashboardProps {
@@ -34,6 +35,7 @@ interface Claim {
 }
 
 export default function Dashboard({ supabase }: DashboardProps) {
+  const navigate = useNavigate();
   const [workerData, setWorkerData] = useState<WorkerData | null>(null);
   const [disruption, setDisruption] = useState<DisruptionResult | null>(null);
   const [payout, setPayout] = useState<PayoutResult | null>(null);
@@ -64,6 +66,12 @@ export default function Dashboard({ supabase }: DashboardProps) {
         .maybeSingle();
 
       if (error) throw error;
+
+      if (!data) {
+        navigate('/onboarding', { replace: true });
+        return;
+      }
+
       setWorkerData(data);
     } catch (err) {
       const error = err as Error | { message: string };

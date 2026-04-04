@@ -1,20 +1,20 @@
 import { useState } from 'react';
 import { Activity, AlertCircle } from 'lucide-react';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import { useNavigate } from 'react-router-dom';
 
 interface AuthPageProps {
   supabase: SupabaseClient;
 }
 
 export default function AuthPage({ supabase }: AuthPageProps) {
+  const navigate = useNavigate();
   const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [formData, setFormData] = useState({
-    name: '',
     email: '',
     password: '',
-    weeklyEarnings: '',
   });
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -36,26 +36,16 @@ export default function AuthPage({ supabase }: AuthPageProps) {
           password: formData.password,
         });
         if (error) throw error;
+        navigate('/dashboard', { replace: true });
       } else {
-        const { data, error: signUpError } = await supabase.auth.signUp({
+        const { error: signUpError } = await supabase.auth.signUp({
           email: formData.email,
           password: formData.password,
         });
 
         if (signUpError) throw signUpError;
 
-        if (data.user) {
-          const { error: insertError } = await supabase
-            .from('gig_workers')
-            .insert({
-              user_id: data.user.id,
-              name: formData.name,
-              email: formData.email,
-              weekly_earnings: parseFloat(formData.weeklyEarnings) || 0,
-            });
-
-          if (insertError) throw insertError;
-        }
+        navigate('/dashboard', { replace: true });
       }
     } catch (err) {
       const error = err as Error | { message: string };
@@ -86,18 +76,6 @@ export default function AuthPage({ supabase }: AuthPageProps) {
           )}
 
           <form onSubmit={handleSubmit} className="space-y-4">
-            {!isLogin && (
-              <input
-                type="text"
-                name="name"
-                placeholder="Full Name"
-                value={formData.name}
-                onChange={handleChange}
-                required={!isLogin}
-                className="input-field"
-              />
-            )}
-
             <input
               type="email"
               name="email"
@@ -118,18 +96,6 @@ export default function AuthPage({ supabase }: AuthPageProps) {
               className="input-field"
             />
 
-            {!isLogin && (
-              <input
-                type="number"
-                name="weeklyEarnings"
-                placeholder="Weekly Earnings (₹)"
-                value={formData.weeklyEarnings}
-                onChange={handleChange}
-                required={!isLogin}
-                className="input-field"
-              />
-            )}
-
             <button
               type="submit"
               disabled={loading}
@@ -146,7 +112,7 @@ export default function AuthPage({ supabase }: AuthPageProps) {
                 onClick={() => {
                   setIsLogin(!isLogin);
                   setError('');
-                  setFormData({ name: '', email: '', password: '', weeklyEarnings: '' });
+                  setFormData({ email: '', password: '' });
                 }}
                 className="ml-2 text-teal-500 hover:text-teal-400 font-medium transition"
               >
