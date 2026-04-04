@@ -1,120 +1,170 @@
-RakSetu — AI-Powered Income Protection for Gig Workers
+# RakSetu - AI-Powered Parametric Insurance Platform
 
-“Bridging Income Stability in an Unpredictable World”
+RakSetu is a full-stack web application designed for gig workers (delivery partners like Zomato, Swiggy) to access parametric insurance based on real-time disruption detection.
 
-📌 Overview
+## Features
 
-RakSetu is a futuristic, AI-powered parametric insurance prototype designed to protect gig workers in India from income loss caused by external disruptions such as extreme weather, air pollution, and environmental conditions.
+### Authentication
+- User registration with email, password, name, and weekly earnings
+- Secure JWT-based authentication via Supabase
+- Login and logout functionality
 
-Unlike traditional insurance systems, RakSetu:
+### Dashboard
+- Display worker profile and weekly income
+- Real-time disruption score calculation (0-100)
+- Automatic payout eligibility based on disruption level
+- Claim management system
 
-Requires no claims process
+### Disruption Engine
+- Random disruption score generation (0-100)
+- Status classification:
+  - LOW: 0-39 (0% payout)
+  - MEDIUM: 40-69 (30% of weekly income)
+  - HIGH: 70-100 (60% of weekly income)
 
-Works on a weekly pricing model
+### Payout & Claims
+- Calculate insurance payout based on disruption score
+- Claim disbursement with fraud detection
+- Fraud flag if multiple claims within 60 seconds
+- Complete claim history
 
-Provides instant, automated payouts based on real-world conditions
+## Tech Stack
 
-This project is a frontend prototype built to demonstrate how AI and parametric models can transform financial security for India’s gig economy.
+- **Frontend**: React 18 + Vite + TypeScript
+- **Backend**: Supabase (PostgreSQL + Auth)
+- **Database**: Supabase PostgreSQL with RLS
+- **Authentication**: Supabase Auth (Email/Password)
+- **Styling**: Tailwind CSS
+- **Icons**: Lucide React
 
-🎯 Problem Statement
+## Setup & Installation
 
-Gig workers (Zomato, Swiggy, Amazon, etc.) often lose 20–30% of their income due to factors beyond their control, such as:
+### Prerequisites
+- Node.js 18+ and npm
 
-Heavy rainfall 🌧
+### Quick Start
 
-High AQI / pollution 🌫
-
-Extreme heat 🌡
-
-Currently, there is no income protection system for these disruptions.
-
-💡 Our Solution
-
-RakSetu introduces an AI-driven income protection layer that:
-
-📊 Predicts income loss using environmental data
-
-💸 Calculates fair weekly premiums
-
-⚡ Automatically triggers payouts during disruptions
-
-🛡 Uses AI-based fraud detection mechanisms
-
-✨ Key Features
-
-⚡ AI Risk Simulator
-Calculates risk score, expected loss, and premium dynamically
-
-🌍 Disruption Intelligence Map
-Visualizes environmental risks across cities
-
-💸 Weekly Protection Plans
-Flexible, income-aligned coverage system
-
-📡 Live Disruption Feed
-Simulated real-time alerts for payouts
-
-🛡 AI Fraud Detection UI
-Demonstrates intelligent validation systems
-
-📊 User Dashboard
-Tracks income protection, payouts, and risk trends
-
-🧠 Tech Stack
-
-Frontend: React.js
-
-Styling: Tailwind CSS
-
-UI Components: ShadCN UI
-
-Charts: Recharts
-
-Icons: Lucide React
-
-🚫 Constraints Followed
-
-❌ No coverage for health, life, accidents, or vehicle repairs
-
-✅ Focus only on income loss due to external disruptions
-
-✅ Weekly pricing model strictly implemented
-
-🛠 How to Run the Project
-1. Clone the Repository
-git clone https://github.com/your-username/raksetu.git
-cd raksetu
-2. Install Dependencies
+```bash
+# Install dependencies
 npm install
-3. Run the Development Server
+
+# Set up environment variables (already configured in .env)
+# The .env file contains your Supabase credentials
+
+# Run the development server
 npm run dev
-4. Open in Browser
-http://localhost:3000
 
+# Open your browser and navigate to:
+# http://localhost:5173
+```
 
-🚀 Future Scope
+### Build for Production
 
-🌐 Integrate real-time weather & AQI APIs
+```bash
+npm run build
+```
 
-🤖 Implement actual AI/ML models for risk prediction
+## Project Structure
 
-💳 Payment gateway integration for subscriptions
+```
+project/
+├── src/
+│   ├── App.tsx                 # Main app component
+│   ├── index.css               # Global styles with Tailwind
+│   ├── main.tsx                # React entry point
+│   └── pages/
+│       ├── AuthPage.tsx        # Login & Registration
+│       └── Dashboard.tsx       # Main dashboard
+├── package.json
+├── tailwind.config.js
+├── vite.config.ts
+└── .env                        # Supabase credentials
+```
 
-📱 Mobile app for gig workers
+## Database Schema
 
-🔗 Smart contract-based automated payouts
+### gig_workers
+- Stores worker profile information
+- Fields: id, user_id, name, email, weekly_earnings, created_at
+- RLS: Users can only view/update their own records
 
-🤝 Contributors
+### disruption_checks
+- Tracks disruption score checks
+- Fields: id, user_id, disruption_score (0-100), status, checked_at
+- RLS: Users can view and insert their own checks
 
-PASUPUREDDY VAMSI KRISHNA
-KADTHALA SIDDHARTHA REDDY
-VELISETTY HARSHINI
+### claims
+- Stores claim records
+- Fields: id, user_id, disruption_score, payout_amount, fraud_flagged, claim_status, created_at
+- RLS: Users can view and insert their own claims
 
-📄 License
+## How to Use
 
-This project is for educational and prototype purposes.
+1. **Register**: Create a new account with your email, name, password, and weekly earnings
+2. **Login**: Use your credentials to access the dashboard
+3. **Check Disruption**: Click "Check Disruption" to get a random disruption score
+4. **Calculate Payout**: Click "Calculate Payout" to see how much insurance you're eligible for
+5. **Claim Payout**: Click "Claim Payout" to submit your insurance claim
+6. **View History**: See all your previous claims in the claim history section
 
-💬 Final Note
+## Authentication Flow
 
-RakSetu is not just an insurance concept —
-it’s a step toward building a financial safety net for India’s gig workforce using AI and automation.
+- User registers with email and password
+- Supabase creates auth user and stores in auth.users
+- Worker profile data stored in gig_workers table
+- JWT token stored in localStorage
+- Token sent in Authorization header for authenticated requests
+- Logout clears session and localStorage
+
+## Fraud Detection
+
+The system flags claims as fraudulent if:
+- Multiple claims are submitted within 60 seconds from the same user
+- Flagged claims are marked as REJECTED
+
+## Security
+
+- Row Level Security (RLS) enabled on all tables
+- Authenticated users can only access their own data
+- Passwords are securely hashed by Supabase
+- All API calls require valid JWT token
+
+## Available Scripts
+
+```bash
+npm run dev        # Start development server
+npm run build      # Build for production
+npm run preview    # Preview production build
+npm run typecheck  # Run TypeScript type checking
+npm run lint       # Run ESLint
+```
+
+## Environment Variables
+
+The `.env` file contains:
+- `VITE_SUPABASE_URL`: Your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY`: Your Supabase anonymous key
+
+These are already configured and should not be changed.
+
+## Troubleshooting
+
+**Issue**: Cannot connect to Supabase
+- Solution: Verify VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in .env are correct
+
+**Issue**: Auth errors
+- Solution: Clear browser cache/localStorage and try registering again
+
+**Issue**: Build fails
+- Solution: Run `npm install` to ensure all dependencies are installed
+
+## Notes
+
+- Disruption scores are randomly generated (0-100) for simulation
+- Payout calculations are immediate and deterministic
+- Fraud detection only checks within 60-second window
+- All times are stored in UTC
+
+## License
+
+MIT
