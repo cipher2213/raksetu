@@ -7,9 +7,16 @@ interface OnboardingProps {
   supabase: SupabaseClient;
 }
 
+type WorkType = 'Food Delivery' | 'Grocery Delivery' | 'E-commerce Delivery';
+type VehicleType = 'Bike' | 'Bicycle' | 'EV';
+
 export default function Onboarding({ supabase }: OnboardingProps) {
   const navigate = useNavigate();
   const [name, setName] = useState('');
+  const [workType, setWorkType] = useState<WorkType | ''>('');
+  const [city, setCity] = useState('');
+  const [hoursPerDay, setHoursPerDay] = useState('');
+  const [vehicleType, setVehicleType] = useState<VehicleType | ''>('');
   const [weeklyEarnings, setWeeklyEarnings] = useState('');
   const [loading, setLoading] = useState(false);
   const [checking, setChecking] = useState(true);
@@ -80,8 +87,35 @@ export default function Onboarding({ supabase }: OnboardingProps) {
       }
 
       const earningsValue = parseFloat(weeklyEarnings);
+      const hoursValue = parseFloat(hoursPerDay);
+
+      if (!name.trim()) {
+        setError('Please enter your name.');
+        return;
+      }
+
       if (Number.isNaN(earningsValue) || earningsValue < 0) {
         setError('Please enter a valid weekly earnings value.');
+        return;
+      }
+
+      if (!workType) {
+        setError('Please select your work type.');
+        return;
+      }
+
+      if (!city.trim()) {
+        setError('Please enter your city.');
+        return;
+      }
+
+      if (Number.isNaN(hoursValue) || hoursValue <= 0 || hoursValue > 24) {
+        setError('Please enter valid hours per day (between 0 and 24).');
+        return;
+      }
+
+      if (!vehicleType) {
+        setError('Please select your vehicle type.');
         return;
       }
 
@@ -106,6 +140,10 @@ export default function Onboarding({ supabase }: OnboardingProps) {
         name: name.trim(),
         email: user.email ?? '',
         weekly_earnings: earningsValue,
+        work_type: workType,
+        city: city.trim(),
+        hours_per_day: hoursValue,
+        vehicle_type: vehicleType,
       });
 
       if (insertError) {
@@ -134,7 +172,7 @@ export default function Onboarding({ supabase }: OnboardingProps) {
 
   return (
     <div className="min-h-[60vh] flex items-center justify-center px-4">
-      <div className="w-full max-w-md card border-2 border-teal-500/20">
+      <div className="w-full max-w-2xl card border-2 border-teal-500/20">
         <h2 className="text-2xl font-semibold text-gray-50 text-center mb-6">Set Up Your Profile</h2>
 
         {error && (
@@ -145,25 +183,72 @@ export default function Onboarding({ supabase }: OnboardingProps) {
         )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <input
-            type="text"
-            placeholder="Name"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            required
-            className="input-field"
-          />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <input
+              type="text"
+              placeholder="Name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+              className="input-field"
+            />
 
-          <input
-            type="number"
-            placeholder="Weekly Earnings"
-            value={weeklyEarnings}
-            onChange={(e) => setWeeklyEarnings(e.target.value)}
-            min="0"
-            step="0.01"
-            required
-            className="input-field"
-          />
+            <select
+              value={workType}
+              onChange={(e) => setWorkType(e.target.value as WorkType | '')}
+              required
+              className="input-field"
+            >
+              <option value="">Select Work Type</option>
+              <option value="Food Delivery">Food Delivery</option>
+              <option value="Grocery Delivery">Grocery Delivery</option>
+              <option value="E-commerce Delivery">E-commerce Delivery</option>
+            </select>
+
+            <input
+              type="text"
+              placeholder="City"
+              value={city}
+              onChange={(e) => setCity(e.target.value)}
+              required
+              className="input-field"
+            />
+
+            <input
+              type="number"
+              placeholder="Hours Per Day"
+              value={hoursPerDay}
+              onChange={(e) => setHoursPerDay(e.target.value)}
+              min="1"
+              max="24"
+              step="0.5"
+              required
+              className="input-field"
+            />
+
+            <select
+              value={vehicleType}
+              onChange={(e) => setVehicleType(e.target.value as VehicleType | '')}
+              required
+              className="input-field"
+            >
+              <option value="">Select Vehicle Type</option>
+              <option value="Bike">Bike</option>
+              <option value="Bicycle">Bicycle</option>
+              <option value="EV">EV</option>
+            </select>
+
+            <input
+              type="number"
+              placeholder="Weekly Earnings"
+              value={weeklyEarnings}
+              onChange={(e) => setWeeklyEarnings(e.target.value)}
+              min="0"
+              step="0.01"
+              required
+              className="input-field"
+            />
+          </div>
 
           <button type="submit" disabled={loading} className="btn-primary">
             {loading ? 'Saving...' : 'Continue'}

@@ -12,6 +12,9 @@ interface WorkerData {
   name: string;
   email: string;
   weekly_earnings: number;
+  work_type: 'Food Delivery' | 'Grocery Delivery' | 'E-commerce Delivery' | null;
+  hours_per_day: number | null;
+  vehicle_type: 'Bike' | 'Bicycle' | 'EV' | null;
 }
 
 interface DisruptionResult {
@@ -21,8 +24,16 @@ interface DisruptionResult {
 
 interface PayoutResult {
   score: number;
+  baseAmount: number;
   amount: number;
   percentage: number;
+  multipliers: {
+    workType: number;
+    hoursPerDay: number;
+    vehicleType: number;
+    total: number;
+  };
+  explanation: string;
 }
 
 interface Claim {
@@ -30,7 +41,7 @@ interface Claim {
   disruption_score: number;
   payout_amount: number;
   fraud_flagged: boolean;
-  claim_status: string;
+  claim_status?: string;
   created_at: string;
 }
 
@@ -46,7 +57,8 @@ export default function Dashboard({ supabase }: DashboardProps) {
     claim: false,
   });
   const [error, setError] = useState('');
-  const [lastClaimTime, setLastClaimTime] = useState<number>(0);
+  const [claimSubmitted, setClaimSubmitted] = useState(false);
+  const [claimSuccessMessage, setClaimSuccessMessage] = useState('');
 
   useEffect(() => {
     fetchWorkerData();
@@ -99,6 +111,8 @@ export default function Dashboard({ supabase }: DashboardProps) {
   };
 
   const handleCheckDisruption = async () => {
+    setClaimSubmitted(false);
+    setClaimSuccessMessage('');
     setLoading({ ...loading, disruption: true });
     setError('');
 
@@ -142,8 +156,16 @@ export default function Dashboard({ supabase }: DashboardProps) {
       return;
     }
 
+    if (!workerData) {
+      setError('Worker profile not available');
+      return;
+    }
+
+    setClaimSubmitted(false);
+    setClaimSuccessMessage('');
+
     const score = disruption.score;
-    let amount = 0;
+    let baseAmount = 0;
     let percentage = 0;
 
     if (score < 40) {
@@ -154,11 +176,69 @@ export default function Dashboard({ supabase }: DashboardProps) {
       percentage = 60;
     }
 
-    if (workerData) {
-      amount = (workerData.weekly_earnings * percentage) / 100;
-    }
+    baseAmount = (workerData.weekly_earnings * percentage) / 100;
 
-    setPayout({ score, amount, percentage });
+    const getWorkTypeMultiplier = (workType: WorkerData['work_type']) => {
+      if (workType === 'Food Delivery') return 1.2;
+      if (workType === 'Grocery Delivery') return 1.1;
+      return 1.0;
+    };
+
+    const getHoursMultiplier = (hours: WorkerData['hours_per_day']) => {
+      if (!hours && hours !== 0) return 1.0;
+      if (hours > 8) return 1.2;
+      if (hours >= 5) return 1.0;
+      return 0.8;
+    };
+
+    const getVehicleMultiplier = (vehicle: WorkerData['vehicle_type']) => {
+      if (vehicle === 'Bike') return 1.2;
+      if (vehicle === 'EV') return 0.9;
+      return 1.0;
+    };
+
+    const workTypeMultiplier = getWorkTypeMultiplier(workerData.work_type);
+    const hoursMultiplier = getHoursMultiplier(workerData.hours_per_day);
+    const vehicleMultiplier = getVehicleMultiplier(workerData.vehicle_type);
+    const totalMultiplier = workTypeMultiplier * hoursMultiplier * vehicleMultiplier;
+    const finalAmount = baseAmount * totalMultiplier;
+
+    const generatePayoutExplanation = () => {
+      const hours = workerData.hours_per_day ?? 0;
+      const workType = workerData.work_type ?? 'E-commerce Delivery';
+      const vehicleType = workerData.vehicle_type ?? 'Bicycle';
+
+      if (score < 40) {
+        return 'Low disruption detected, so no payout was triggered. Profile risk signals were evaluated, but base coverage remains inactive at this score.';
+      }
+
+      if (score >= 70) {
+        if (vehicleType === 'Bike' && hours > 8) {
+          return 'High disruption detected. As a bike-based delivery worker with long working hours, your risk exposure is higher, resulting in increased payout.';
+        }
+        return `High disruption detected. Your ${workType.toLowerCase()} profile and current work pattern increased risk weighting, so compensation was adjusted upward.`;
+      }
+
+      if (hours > 8 || workType === 'Food Delivery') {
+        return 'Moderate disruption detected. Based on your working hours and delivery type, your compensation has been adjusted accordingly.';
+      }
+
+      return `Moderate disruption detected. Your ${vehicleType.toLowerCase()} usage and work profile were factored in to personalize the payout amount.`;
+    };
+
+    setPayout({
+      score,
+      baseAmount,
+      amount: finalAmount,
+      percentage,
+      multipliers: {
+        workType: workTypeMultiplier,
+        hoursPerDay: hoursMultiplier,
+        vehicleType: vehicleMultiplier,
+        total: totalMultiplier,
+      },
+      explanation: generatePayoutExplanation(),
+    });
   };
 
   const handleClaimPayout = async () => {
@@ -167,45 +247,39 @@ export default function Dashboard({ supabase }: DashboardProps) {
       return;
     }
 
-    const now = Date.now();
-    if (now - lastClaimTime < 60000) {
-      setError('Cannot claim twice within 60 seconds (fraud detection)');
+    if (claimSubmitted) {
       return;
     }
 
+    setClaimSuccessMessage('');
     setLoading({ ...loading, claim: true });
     setError('');
 
     try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('Not authenticated');
+      // Demo-only claim simulation (no backend dependency).
+      await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      const fraudFlagged = now - lastClaimTime < 60000;
+      const formattedAmount = payout.amount.toLocaleString('en-IN', {
+        maximumFractionDigits: 2,
+      });
 
-      const { error: insertError } = await supabase
-        .from('claims')
-        .insert({
-          user_id: user.id,
-          disruption_score: disruption.score,
-          payout_amount: payout.amount,
-          fraud_flagged: fraudFlagged,
-          claim_status: fraudFlagged ? 'REJECTED' : 'APPROVED',
-        });
-
-      if (insertError) throw insertError;
-
-      setLastClaimTime(now);
-      fetchClaims();
-
-      if (fraudFlagged) {
-        setError('Claim flagged as fraud (multiple claims detected)');
-      }
-    } catch (err) {
-      const error = err as Error | { message: string };
-      setError('message' in error ? error.message : 'Failed to submit claim');
+      setClaimSubmitted(true);
+      setClaimSuccessMessage(
+        `Payout initiated successfully. Based on your disruption profile, ₹${formattedAmount} will be credited within 24 hours.`
+      );
+    } catch {
+      setError('Unable to submit claim right now. Please try again.');
     } finally {
       setLoading({ ...loading, claim: false });
     }
+  };
+
+  const getClaimStatus = (claim: Claim) => {
+    if (claim.claim_status) {
+      return claim.claim_status;
+    }
+
+    return claim.fraud_flagged ? 'REJECTED' : 'APPROVED';
   };
 
   const getStatusColor = (status: string) => {
@@ -318,8 +392,16 @@ export default function Dashboard({ supabase }: DashboardProps) {
                 ₹{payout.amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })}
               </p>
               <p className="text-gray-400 text-sm mb-4">
-                {payout.percentage}% of weekly income
+                Base: {payout.percentage}% (₹{payout.baseAmount.toLocaleString('en-IN', { maximumFractionDigits: 2 })})
               </p>
+              <p className="text-gray-400 text-xs mb-4">
+                Multipliers: Work {payout.multipliers.workType} x Hours {payout.multipliers.hoursPerDay} x Vehicle {payout.multipliers.vehicleType} = {payout.multipliers.total.toFixed(2)}x
+              </p>
+
+              <div className="p-3 rounded-lg bg-gray-950/60 border border-gray-800">
+                <p className="text-teal-400 text-xs font-semibold mb-1">AI Insight</p>
+                <p className="text-gray-300 text-sm leading-relaxed">{payout.explanation}</p>
+              </div>
             </div>
           ) : (
             <p className="text-gray-400 text-sm mb-4">Calculate based on disruption</p>
@@ -350,11 +432,22 @@ export default function Dashboard({ supabase }: DashboardProps) {
 
           <button
             onClick={handleClaimPayout}
-            disabled={!payout || loading.claim}
+            disabled={!payout || loading.claim || claimSubmitted}
             className="btn-primary"
           >
-            {loading.claim ? 'Claiming...' : 'Claim Payout'}
+            {claimSubmitted ? 'Claim Submitted' : loading.claim ? 'Submitting Claim...' : 'Claim Payout'}
           </button>
+
+          {claimSubmitted && payout && (
+            <div className="mt-4 p-4 rounded-lg bg-emerald-950/40 border border-emerald-500/30">
+              <p className="text-emerald-300 font-medium">Claim Submitted</p>
+              <p className="text-gray-200 text-sm mt-1">
+                ₹{payout.amount.toLocaleString('en-IN', { maximumFractionDigits: 2 })} is being processed
+              </p>
+              <p className="text-emerald-200 text-xs mt-1">Expected Credit: Within 24 hours</p>
+              <p className="text-gray-300 text-xs mt-2">{claimSuccessMessage}</p>
+            </div>
+          )}
         </div>
       </div>
 
@@ -365,7 +458,7 @@ export default function Dashboard({ supabase }: DashboardProps) {
             {claims.map((claim) => (
               <div
                 key={claim.id}
-                className={`p-4 rounded-lg border ${getStatusBg(claim.claim_status)}`}
+                className={`p-4 rounded-lg border ${getStatusBg(getClaimStatus(claim))}`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div>
@@ -375,8 +468,8 @@ export default function Dashboard({ supabase }: DashboardProps) {
                     <p className="text-gray-400 text-sm">Disruption: {claim.disruption_score}</p>
                   </div>
                   <div className="text-right">
-                    <p className={`font-medium ${getStatusColor(claim.claim_status)}`}>
-                      {claim.claim_status}
+                    <p className={`font-medium ${getStatusColor(getClaimStatus(claim))}`}>
+                      {getClaimStatus(claim)}
                     </p>
                     {claim.fraud_flagged && (
                       <p className="text-red-400 text-xs mt-1">Fraud Detected</p>
